@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard - E-Rubber Weight</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  body { background:#f4f6f5; }
+  .stat-card { border-radius:14px; border:none; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+  .stat-value { font-size:1.8rem; font-weight:700; color:#2d6a4f; }
+</style>
+</head>
+<body>
+<div class="container-fluid px-4 pb-5">
+  <h4 class="mb-4">📊 Dashboard Produksi Harian</h4>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card stat-card p-3">
+        <div class="text-muted small">Total Hasil Sadap Hari Ini</div>
+        <div class="stat-value" id="totalHariIni">-</div>
+        <div class="text-muted small">kg</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card p-3">
+        <div class="text-muted small">Jumlah Afdeling Aktif</div>
+        <div class="stat-value" id="jumlahAfdeling">-</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card stat-card p-3">
+        <div class="text-muted small">Tanggal</div>
+        <div class="stat-value" id="tanggalHariIni" style="font-size:1.2rem;">-</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-7">
+      <div class="card stat-card p-3">
+        <h6>Tren Produksi 14 Hari Terakhir</h6>
+        <canvas id="trenChart" height="120"></canvas>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="card stat-card p-3">
+        <h6>Rekap per Afdeling (Hari Ini)</h6>
+        <table class="table table-sm mt-2">
+          <thead><tr><th>Afdeling</th><th class="text-end">Total (kg)</th><th class="text-end">Penyadap</th></tr></thead>
+          <tbody id="tabelAfdeling"><tr><td colspan="3" class="text-muted">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+renderNav('dashboard.html');
+
+async function loadDashboard() {
+  const today = new Date().toISOString().slice(0,10);
+  document.getElementById('tanggalHariIni').textContent = new Date().toLocaleDateString('id-ID', { day:'numeric', month:'long', year:'numeric' });
+
+  const rekap = await fetch(`/api/rekap/harian?tanggal=${today}`).then(r => r.json());
+  document.getElementById('totalHariIni').textContent = rekap.total_kg.toLocaleString('id-ID');
+  document.getElementById('jumlahAfdeling').textContent = rekap.per_afdeling.length;
+
+  const tbody = document.getElementById('tabelAfdeling');
+  if (rekap.per_afdeling.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="text-muted">Belum ada data hari ini</td></tr>';
+  } else {
+    tbody.innerHTML = rekap.per_afdeling.map(a => `
+      <tr><td>${a.nama_afdeling}</td><td class="text-end">${a.total_kg.toLocaleString('id-ID')}</td><td class="text-end">${a.jumlah_penyadap}</td></tr>
+    `).join('');
+  }
+
+  const tren = await fetch('/api/rekap/tren?hari=14').then(r => r.json());
+  const ctx = document.getElementById('trenChart');
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: tren.map(t => t.tanggal.slice(5)),
+      datasets: [{
+        label: 'Total Produksi (kg)',
+        data: tren.map(t => t.total_kg),
+        borderColor: '#2d6a4f',
+        backgroundColor: 'rgba(45,106,79,0.1)',
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+}
+loadDashboard();
+</script>
+</body>
+</html>

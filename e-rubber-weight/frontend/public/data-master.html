@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Master - E-Rubber Weight</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<style> body { background:#f4f6f5; } .card-box{border-radius:14px;border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);} </style>
+</head>
+<body>
+<div class="container-fluid px-4 pb-5">
+  <h4 class="mb-4">🗂️ Data Master</h4>
+
+  <ul class="nav nav-tabs mb-3">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabAfdeling">Afdeling</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabBlok">Blok</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabPenyadap">Penyadap</button></li>
+  </ul>
+
+  <div class="tab-content">
+    <div class="tab-pane fade show active" id="tabAfdeling">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="card card-box p-3">
+            <h6>Tambah Afdeling</h6>
+            <form id="formAfdeling">
+              <input type="text" class="form-control mb-2" id="namaAfdeling" placeholder="Nama afdeling" required>
+              <button class="btn text-white w-100" style="background:#2d6a4f;">Simpan</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card card-box p-3">
+            <table class="table table-sm"><thead><tr><th>Nama Afdeling</th></tr></thead><tbody id="tabelAfdeling"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tabBlok">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="card card-box p-3">
+            <h6>Tambah Blok</h6>
+            <form id="formBlok">
+              <select class="form-select mb-2" id="afdelingIdBlok" required></select>
+              <input type="text" class="form-control mb-2" id="namaBlok" placeholder="Nama blok" required>
+              <input type="number" step="0.1" class="form-control mb-2" id="luasHa" placeholder="Luas (ha, opsional)">
+              <button class="btn text-white w-100" style="background:#2d6a4f;">Simpan</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card card-box p-3">
+            <table class="table table-sm"><thead><tr><th>Blok</th><th>Afdeling</th><th>Luas (ha)</th><th></th></tr></thead><tbody id="tabelBlok"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="tabPenyadap">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="card card-box p-3">
+            <h6>Tambah Penyadap</h6>
+            <form id="formPenyadap">
+              <input type="text" class="form-control mb-2" id="namaPenyadap" placeholder="Nama penyadap" required>
+              <input type="text" class="form-control mb-2" id="nikPenyadap" placeholder="NIK (opsional)">
+              <select class="form-select mb-2" id="blokIdPenyadap" required></select>
+              <button class="btn text-white w-100" style="background:#2d6a4f;">Simpan</button>
+            </form>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card card-box p-3">
+            <table class="table table-sm"><thead><tr><th>Nama</th><th>Blok</th><th>Status</th><th></th></tr></thead><tbody id="tabelPenyadap"></tbody></table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+renderNav('data-master.html');
+
+async function loadAfdeling() {
+  const list = await fetch('/api/afdeling').then(r => r.json());
+  document.getElementById('tabelAfdeling').innerHTML = list.map(a => `<tr><td>${a.nama_afdeling}</td></tr>`).join('') || '<tr><td class="text-muted">Belum ada data</td></tr>';
+  const selects = [document.getElementById('afdelingIdBlok')];
+  selects.forEach(s => s.innerHTML = list.map(a => `<option value="${a.id}">${a.nama_afdeling}</option>`).join(''));
+}
+
+async function loadBlok() {
+  const list = await fetch('/api/blok').then(r => r.json());
+  document.getElementById('tabelBlok').innerHTML = list.map(b => `
+    <tr><td>${b.nama_blok}</td><td>${b.nama_afdeling}</td><td>${b.luas_ha ?? '-'}</td>
+    <td><button class="btn btn-sm btn-outline-danger" onclick="hapusBlok(${b.id})">Hapus</button></td></tr>
+  `).join('') || '<tr><td colspan="4" class="text-muted">Belum ada data</td></tr>';
+  document.getElementById('blokIdPenyadap').innerHTML = list.map(b => `<option value="${b.id}">${b.nama_blok} (${b.nama_afdeling})</option>`).join('');
+}
+
+async function loadPenyadap() {
+  const list = await fetch('/api/penyadap').then(r => r.json());
+  document.getElementById('tabelPenyadap').innerHTML = list.map(p => `
+    <tr><td>${p.nama}</td><td>${p.nama_blok}</td><td><span class="badge ${p.status==='aktif'?'bg-success':'bg-secondary'}">${p.status}</span></td>
+    <td><button class="btn btn-sm btn-outline-danger" onclick="hapusPenyadap(${p.id})">Hapus</button></td></tr>
+  `).join('') || '<tr><td colspan="4" class="text-muted">Belum ada data</td></tr>';
+}
+
+async function hapusBlok(id) { if(confirm('Hapus blok ini?')) { await fetch(`/api/blok/${id}`, {method:'DELETE'}); loadBlok(); } }
+async function hapusPenyadap(id) { if(confirm('Hapus penyadap ini?')) { await fetch(`/api/penyadap/${id}`, {method:'DELETE'}); loadPenyadap(); } }
+
+document.getElementById('formAfdeling').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await fetch('/api/afdeling', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({nama_afdeling: document.getElementById('namaAfdeling').value})});
+  document.getElementById('namaAfdeling').value = '';
+  loadAfdeling();
+});
+
+document.getElementById('formBlok').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await fetch('/api/blok', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+    nama_blok: document.getElementById('namaBlok').value,
+    afdeling_id: document.getElementById('afdelingIdBlok').value,
+    luas_ha: document.getElementById('luasHa').value || null
+  })});
+  document.getElementById('namaBlok').value = '';
+  document.getElementById('luasHa').value = '';
+  loadBlok();
+});
+
+document.getElementById('formPenyadap').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const res = await fetch('/api/penyadap', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({
+    nama: document.getElementById('namaPenyadap').value,
+    nik: document.getElementById('nikPenyadap').value,
+    blok_id: document.getElementById('blokIdPenyadap').value
+  })});
+  if (res.ok) {
+    document.getElementById('namaPenyadap').value = '';
+    document.getElementById('nikPenyadap').value = '';
+    loadPenyadap();
+  } else {
+    alert((await res.json()).error);
+  }
+});
+
+(async () => { await loadAfdeling(); await loadBlok(); await loadPenyadap(); })();
+</script>
+</body>
+</html>

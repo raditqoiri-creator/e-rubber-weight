@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Input Sadap - E-Rubber Weight</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<style> body { background:#f4f6f5; } .card-box{border-radius:14px;border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);} </style>
+</head>
+<body>
+<div class="container-fluid px-4 pb-5">
+  <h4 class="mb-4">📝 Input Hasil Sadap Harian</h4>
+
+  <div class="row g-3">
+    <div class="col-md-5">
+      <div class="card card-box p-3">
+        <h6>Form Input</h6>
+        <form id="formSadap">
+          <div class="mb-2">
+            <label class="form-label small">Tanggal</label>
+            <input type="date" class="form-control" id="tanggal" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Penyadap</label>
+            <select class="form-select" id="penyadapId" required></select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Berat (kg)</label>
+            <input type="number" step="0.1" min="0" class="form-control" id="beratKg" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Keterangan (opsional)</label>
+            <input type="text" class="form-control" id="keterangan">
+          </div>
+          <div id="msg" class="alert py-2 d-none"></div>
+          <button type="submit" class="btn text-white w-100" style="background:#2d6a4f;">Simpan</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="col-md-7">
+      <div class="card card-box p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0">Data Hari Ini</h6>
+          <input type="date" id="filterTanggal" class="form-control form-control-sm" style="width:auto;">
+        </div>
+        <table class="table table-sm">
+          <thead><tr><th>Penyadap</th><th>Blok</th><th class="text-end">Berat (kg)</th><th></th></tr></thead>
+          <tbody id="tabelCatatan"><tr><td colspan="4" class="text-muted">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+renderNav('input-sadap.html');
+const user = getUser();
+const today = new Date().toISOString().slice(0,10);
+document.getElementById('tanggal').value = today;
+document.getElementById('filterTanggal').value = today;
+
+async function loadPenyadap() {
+  const list = await fetch('/api/penyadap').then(r => r.json());
+  const select = document.getElementById('penyadapId');
+  select.innerHTML = list.filter(p => p.status === 'aktif').map(p =>
+    `<option value="${p.id}">${p.nama} (${p.nama_blok})</option>`).join('');
+}
+
+async function loadCatatan() {
+  const tgl = document.getElementById('filterTanggal').value;
+  const list = await fetch(`/api/catatan?tanggal_awal=${tgl}&tanggal_akhir=${tgl}`).then(r => r.json());
+  const tbody = document.getElementById('tabelCatatan');
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map(c => `
+    <tr>
+      <td>${c.nama_penyadap}</td>
+      <td>${c.nama_blok}</td>
+      <td class="text-end">${c.berat_kg}</td>
+      <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="hapusCatatan(${c.id})">Hapus</button></td>
+    </tr>
+  `).join('');
+}
+
+async function hapusCatatan(id) {
+  if (!confirm('Hapus catatan ini?')) return;
+  await fetch(`/api/catatan/${id}?user=${user.username}`, { method: 'DELETE' });
+  loadCatatan();
+}
+
+document.getElementById('formSadap').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('msg');
+  const body = {
+    penyadap_id: document.getElementById('penyadapId').value,
+    tanggal: document.getElementById('tanggal').value,
+    berat_kg: parseFloat(document.getElementById('beratKg').value),
+    keterangan: document.getElementById('keterangan').value,
+    user: user.username
+  };
+  const res = await fetch('/api/catatan', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  msg.classList.remove('d-none');
+  if (!res.ok) {
+    msg.className = 'alert alert-danger py-2';
+    msg.textContent = data.error;
+  } else {
+    msg.className = 'alert alert-success py-2';
+    msg.textContent = 'Data berhasil disimpan';
+    document.getElementById('beratKg').value = '';
+    document.getElementById('keterangan').value = '';
+    loadCatatan();
+  }
+  setTimeout(() => msg.classList.add('d-none'), 2500);
+});
+
+document.getElementById('filterTanggal').addEventListener('change', loadCatatan);
+loadPenyadap();
+loadCatatan();
+</script>
+</body>
+</html>

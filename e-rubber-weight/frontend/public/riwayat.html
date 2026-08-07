@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Riwayat & Log - E-Rubber Weight</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<style> body { background:#f4f6f5; } .card-box{border-radius:14px;border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);} </style>
+</head>
+<body>
+<div class="container-fluid px-4 pb-5">
+  <h4 class="mb-4">📜 Riwayat Catatan & Log Aktivitas</h4>
+
+  <div class="card card-box p-3 mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small">Dari Tanggal</label>
+        <input type="date" class="form-control" id="tglAwal">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Sampai Tanggal</label>
+        <input type="date" class="form-control" id="tglAkhir">
+      </div>
+      <div class="col-md-2">
+        <button class="btn text-white w-100" style="background:#2d6a4f;" onclick="loadCatatan()">Cari</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-7">
+      <div class="card card-box p-3">
+        <h6>Riwayat Catatan Sadap</h6>
+        <div style="max-height:400px; overflow-y:auto;">
+          <table class="table table-sm">
+            <thead><tr><th>Tanggal</th><th>Penyadap</th><th>Blok</th><th class="text-end">Kg</th></tr></thead>
+            <tbody id="tabelCatatan"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-5">
+      <div class="card card-box p-3">
+        <h6>Log Aktivitas Sistem</h6>
+        <div style="max-height:400px; overflow-y:auto;">
+          <table class="table table-sm">
+            <thead><tr><th>Waktu</th><th>User</th><th>Aksi</th></tr></thead>
+            <tbody id="tabelLog"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+renderNav('riwayat.html');
+const today = new Date().toISOString().slice(0,10);
+const awalBulan = today.slice(0,8) + '01';
+document.getElementById('tglAwal').value = awalBulan;
+document.getElementById('tglAkhir').value = today;
+
+async function loadCatatan() {
+  const tglAwal = document.getElementById('tglAwal').value;
+  const tglAkhir = document.getElementById('tglAkhir').value;
+  const list = await fetch(`/api/catatan?tanggal_awal=${tglAwal}&tanggal_akhir=${tglAkhir}`).then(r => r.json());
+  document.getElementById('tabelCatatan').innerHTML = list.map(c => `
+    <tr><td>${c.tanggal}</td><td>${c.nama_penyadap}</td><td>${c.nama_blok}</td><td class="text-end">${c.berat_kg}</td></tr>
+  `).join('') || '<tr><td colspan="4" class="text-muted">Tidak ada data</td></tr>';
+}
+
+async function loadLog() {
+  const list = await fetch('/api/activity-log').then(r => r.json());
+  document.getElementById('tabelLog').innerHTML = list.map(l => `
+    <tr><td class="small">${new Date(l.waktu).toLocaleString('id-ID')}</td><td>${l.user}</td><td class="small">${l.aksi}: ${l.detail || ''}</td></tr>
+  `).join('') || '<tr><td colspan="3" class="text-muted">Belum ada log</td></tr>';
+}
+
+loadCatatan();
+loadLog();
+</script>
+</body>
+</html>

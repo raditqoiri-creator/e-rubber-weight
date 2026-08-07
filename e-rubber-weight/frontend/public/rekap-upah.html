@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rekap Upah - E-Rubber Weight</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<style> body { background:#f4f6f5; } .card-box{border-radius:14px;border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);} </style>
+</head>
+<body>
+<div class="container-fluid px-4 pb-5">
+  <h4 class="mb-4">💰 Rekap Produksi & Upah</h4>
+
+  <div class="card card-box p-3 mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small">Dari Tanggal</label>
+        <input type="date" class="form-control" id="tglAwal">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label small">Sampai Tanggal</label>
+        <input type="date" class="form-control" id="tglAkhir">
+      </div>
+      <div class="col-md-2">
+        <button class="btn text-white w-100" style="background:#2d6a4f;" onclick="loadRekap()">Tampilkan</button>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" onclick="exportCsv()">Export CSV</button>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" data-bs-toggle="modal" data-bs-target="#modalHarga">Atur Harga/kg</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card card-box p-3">
+    <div class="d-flex justify-content-between mb-2">
+      <h6>Hasil Rekap</h6>
+      <span class="text-muted small" id="hargaInfo"></span>
+    </div>
+    <table class="table table-sm">
+      <thead><tr><th>Nama</th><th>Blok</th><th class="text-end">Total (kg)</th><th class="text-end">Total Upah (Rp)</th></tr></thead>
+      <tbody id="tabelUpah"><tr><td colspan="4" class="text-muted">Pilih rentang tanggal lalu klik Tampilkan</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="modalHarga">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Atur Harga per Kg</h6></div>
+      <div class="modal-body">
+        <input type="number" class="form-control mb-2" id="hargaBaru" placeholder="Harga per kg (Rp)">
+        <input type="date" class="form-control" id="berlakuMulai">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button class="btn text-white" style="background:#2d6a4f;" onclick="simpanHarga()">Simpan</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+renderNav('rekap-upah.html');
+
+const today = new Date().toISOString().slice(0,10);
+const awalBulan = today.slice(0,8) + '01';
+document.getElementById('tglAwal').value = awalBulan;
+document.getElementById('tglAkhir').value = today;
+document.getElementById('berlakuMulai').value = today;
+
+async function loadRekap() {
+  const tglAwal = document.getElementById('tglAwal').value;
+  const tglAkhir = document.getElementById('tglAkhir').value;
+  const res = await fetch(`/api/rekap/upah?tanggal_awal=${tglAwal}&tanggal_akhir=${tglAkhir}`).then(r => r.json());
+  document.getElementById('hargaInfo').textContent = `Harga berlaku: Rp ${res.harga_per_kg.toLocaleString('id-ID')}/kg`;
+  const tbody = document.getElementById('tabelUpah');
+  if (res.data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Tidak ada data pada rentang ini</td></tr>';
+    return;
+  }
+  tbody.innerHTML = res.data.map(r => `
+    <tr><td>${r.nama}</td><td>${r.nama_blok}</td><td class="text-end">${r.total_kg.toLocaleString('id-ID')}</td>
+    <td class="text-end">${r.total_upah.toLocaleString('id-ID')}</td></tr>
+  `).join('');
+}
+
+function exportCsv() {
+  const tglAwal = document.getElementById('tglAwal').value;
+  const tglAkhir = document.getElementById('tglAkhir').value;
+  window.location.href = `/api/export/csv?tanggal_awal=${tglAwal}&tanggal_akhir=${tglAkhir}`;
+}
+
+async function simpanHarga() {
+  const harga_per_kg = parseFloat(document.getElementById('hargaBaru').value);
+  const berlaku_mulai = document.getElementById('berlakuMulai').value;
+  if (!harga_per_kg) return alert('Isi harga terlebih dahulu');
+  await fetch('/api/pengaturan-upah', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({harga_per_kg, berlaku_mulai})});
+  bootstrap.Modal.getInstance(document.getElementById('modalHarga')).hide();
+  loadRekap();
+}
+
+loadRekap();
+</script>
+</body>
+</html>
