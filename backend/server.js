@@ -210,6 +210,26 @@ app.get('/api/export/csv', (req, res) => {
   res.send(csv);
 });
 
+// ===== USERS =====
+app.get('/api/users', (req, res) => {
+  res.json(db.prepare('SELECT id, username, nama, role FROM users ORDER BY id').all());
+});
+app.post('/api/users', (req, res) => {
+  const { username, password, nama, role } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username dan password wajib diisi' });
+  try {
+    const info = db.prepare('INSERT INTO users (username, password, nama, role) VALUES (?,?,?,?)')
+      .run(username, password, nama || null, role || 'petugas');
+    res.json({ id: info.lastInsertRowid });
+  } catch (e) {
+    res.status(400).json({ error: 'Username sudah dipakai' });
+  }
+});
+app.delete('/api/users/:id', (req, res) => {
+  db.prepare('DELETE FROM users WHERE id=?').run(req.params.id);
+  res.json({ success: true });
+});
+
 // ===== ACTIVITY LOG =====
 app.get('/api/activity-log', (req, res) => {
   res.json(db.prepare('SELECT * FROM activity_log ORDER BY waktu DESC LIMIT 100').all());

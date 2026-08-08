@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pengguna - E-Rubber Weight</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.3/js/bootstrap.bundle.min.js"></script>
+<style> body { background:#f4f6f5; } .card-box{border-radius:14px;border:none;box-shadow:0 2px 10px rgba(0,0,0,.06);} </style>
+</head>
+<body>
+<div class="container-fluid px-4 pb-5">
+  <h4 class="mb-4">Kelola Pengguna</h4>
+
+  <div id="akses-ditolak" class="alert alert-warning d-none">
+    Halaman ini hanya bisa diakses oleh Administrator.
+  </div>
+
+  <div id="konten-pengguna" class="row g-3">
+    <div class="col-md-4">
+      <div class="card card-box p-3">
+        <h6>Tambah Pengguna</h6>
+        <form id="formUser">
+          <div class="mb-2">
+            <label class="form-label small">Nama Lengkap</label>
+            <input type="text" class="form-control" id="namaUser" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Username</label>
+            <input type="text" class="form-control" id="usernameUser" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Password</label>
+            <input type="text" class="form-control" id="passwordUser" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small">Peran</label>
+            <select class="form-select" id="roleUser">
+              <option value="admin">Administrator</option>
+              <option value="krani">Krani / Staf Administrasi</option>
+              <option value="asisten">Asisten Afdeling</option>
+              <option value="mandor">Mandor</option>
+            </select>
+          </div>
+          <div id="msgUser" class="alert py-2 d-none"></div>
+          <button type="submit" class="btn text-white w-100" style="background:#2d6a4f;">Simpan Pengguna</button>
+        </form>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="card card-box p-3">
+        <h6>Daftar Pengguna</h6>
+        <table class="table table-sm">
+          <thead><tr><th>Nama</th><th>Username</th><th>Peran</th><th class="text-end">Aksi</th></tr></thead>
+          <tbody id="tabelUser"><tr><td colspan="4" class="text-muted">Memuat...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+renderNav('pengguna.html');
+const user = getUser();
+
+const labelRole = { admin: 'Administrator', krani: 'Krani / Staf Administrasi', asisten: 'Asisten Afdeling', mandor: 'Mandor' };
+
+if (user.role !== 'admin') {
+  document.getElementById('konten-pengguna').classList.add('d-none');
+  document.getElementById('akses-ditolak').classList.remove('d-none');
+} else {
+  loadUsers();
+}
+
+async function loadUsers() {
+  const list = await fetch('/api/users').then(r => r.json());
+  document.getElementById('tabelUser').innerHTML = list.map(u => `
+    <tr>
+      <td>${u.nama || '-'}</td>
+      <td>${u.username}</td>
+      <td>${labelRole[u.role] || u.role}</td>
+      <td class="text-end">
+        ${u.username !== 'admin' ? `<button class="btn btn-sm btn-outline-danger" onclick="hapusUser(${u.id})">Hapus</button>` : '<span class="text-muted small">Akun utama</span>'}
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" class="text-muted">Belum ada pengguna lain</td></tr>';
+}
+
+async function hapusUser(id) {
+  if (!confirm('Hapus pengguna ini?')) return;
+  await fetch(`/api/users/${id}`, { method: 'DELETE' });
+  loadUsers();
+}
+
+document.getElementById('formUser').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById('msgUser');
+  const body = {
+    nama: document.getElementById('namaUser').value,
+    username: document.getElementById('usernameUser').value,
+    password: document.getElementById('passwordUser').value,
+    role: document.getElementById('roleUser').value
+  };
+  const res = await fetch('/api/users', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  msg.classList.remove('d-none');
+  if (!res.ok) {
+    msg.className = 'alert alert-danger py-2';
+    msg.textContent = data.error;
+  } else {
+    msg.className = 'alert alert-success py-2';
+    msg.textContent = 'Pengguna berhasil ditambahkan';
+    document.getElementById('formUser').reset();
+    loadUsers();
+  }
+  setTimeout(() => msg.classList.add('d-none'), 2500);
+});
+</script>
+</body>
+</html>

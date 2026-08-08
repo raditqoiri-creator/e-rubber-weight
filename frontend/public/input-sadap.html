@@ -10,7 +10,7 @@
 </head>
 <body>
 <div class="container-fluid px-4 pb-5">
-  <h4 class="mb-4">📝 Input Hasil Sadap Harian</h4>
+  <h4 class="mb-4">Input Hasil Sadap Harian</h4>
 
   <div class="row g-3">
     <div class="col-md-5">
@@ -24,6 +24,7 @@
           <div class="mb-2">
             <label class="form-label small">Penyadap</label>
             <select class="form-select" id="penyadapId" required></select>
+            <div class="form-text" id="penyadapEmptyHint"></div>
           </div>
           <div class="mb-2">
             <label class="form-label small">Berat (kg)</label>
@@ -42,13 +43,31 @@
     <div class="col-md-7">
       <div class="card card-box p-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0">Data Hari Ini</h6>
+          <h6 class="mb-0">Data Tanggal Terpilih</h6>
           <input type="date" id="filterTanggal" class="form-control form-control-sm" style="width:auto;">
         </div>
         <table class="table table-sm">
-          <thead><tr><th>Penyadap</th><th>Blok</th><th class="text-end">Berat (kg)</th><th></th></tr></thead>
+          <thead><tr><th>Penyadap</th><th>Blok</th><th class="text-end">Berat (kg)</th><th class="text-end">Aksi</th></tr></thead>
           <tbody id="tabelCatatan"><tr><td colspan="4" class="text-muted">Memuat...</td></tr></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modalEdit">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Edit Catatan</h6></div>
+      <div class="modal-body">
+        <label class="form-label small">Berat (kg)</label>
+        <input type="number" step="0.1" min="0" class="form-control mb-2" id="editBerat">
+        <label class="form-label small">Keterangan</label>
+        <input type="text" class="form-control" id="editKeterangan">
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button class="btn text-white" style="background:#2d6a4f;" onclick="simpanEdit()">Simpan Perubahan</button>
       </div>
     </div>
   </div>
@@ -61,12 +80,19 @@ const user = getUser();
 const today = new Date().toISOString().slice(0,10);
 document.getElementById('tanggal').value = today;
 document.getElementById('filterTanggal').value = today;
+let editId = null;
 
 async function loadPenyadap() {
   const list = await fetch('/api/penyadap').then(r => r.json());
   const select = document.getElementById('penyadapId');
-  select.innerHTML = list.filter(p => p.status === 'aktif').map(p =>
-    `<option value="${p.id}">${p.nama} (${p.nama_blok})</option>`).join('');
+  const aktif = list.filter(p => p.status === 'aktif');
+  if (aktif.length === 0) {
+    select.innerHTML = '<option value="">Belum ada penyadap terdaftar</option>';
+    document.getElementById('penyadapEmptyHint').textContent = 'Tambahkan penyadap dulu di menu Data Master.';
+  } else {
+    select.innerHTML = aktif.map(p => `<option value="${p.id}">${p.nama} (${p.nama_blok})</option>`).join('');
+    document.getElementById('penyadapEmptyHint').textContent = '';
+  }
 }
 
 async function loadCatatan() {
@@ -74,7 +100,7 @@ async function loadCatatan() {
   const list = await fetch(`/api/catatan?tanggal_awal=${tgl}&tanggal_akhir=${tgl}`).then(r => r.json());
   const tbody = document.getElementById('tabelCatatan');
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada data</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">Belum ada data pada tanggal ini</td></tr>';
     return;
   }
   tbody.innerHTML = list.map(c => `
@@ -82,9 +108,31 @@ async function loadCatatan() {
       <td>${c.nama_penyadap}</td>
       <td>${c.nama_blok}</td>
       <td class="text-end">${c.berat_kg}</td>
-      <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="hapusCatatan(${c.id})">Hapus</button></td>
+      <td class="text-end">
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick='bukaEdit(${JSON.stringify({id:c.id, berat_kg:c.berat_kg, keterangan:c.keterangan||""})})'>Edit</button>
+        <button class="btn btn-sm btn-outline-danger" onclick="hapusCatatan(${c.id})">Hapus</button>
+      </td>
     </tr>
   `).join('');
+}
+
+function bukaEdit(data) {
+  editId = data.id;
+  document.getElementById('editBerat').value = data.berat_kg;
+  document.getElementById('editKeterangan').value = data.keterangan;
+  new bootstrap.Modal(document.getElementById('modalEdit')).show();
+}
+
+async function simpanEdit() {
+  const berat_kg = parseFloat(document.getElementById('editBerat').value);
+  const keterangan = document.getElementById('editKeterangan').value;
+  if (berat_kg < 0 || isNaN(berat_kg)) return alert('Berat tidak valid');
+  await fetch(`/api/catatan/${editId}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ berat_kg, keterangan, user: user.username })
+  });
+  bootstrap.Modal.getInstance(document.getElementById('modalEdit')).hide();
+  loadCatatan();
 }
 
 async function hapusCatatan(id) {
@@ -96,8 +144,15 @@ async function hapusCatatan(id) {
 document.getElementById('formSadap').addEventListener('submit', async (e) => {
   e.preventDefault();
   const msg = document.getElementById('msg');
+  const penyadapId = document.getElementById('penyadapId').value;
+  if (!penyadapId) {
+    msg.className = 'alert alert-danger py-2';
+    msg.textContent = 'Belum ada penyadap terdaftar. Tambahkan dulu di menu Data Master.';
+    msg.classList.remove('d-none');
+    return;
+  }
   const body = {
-    penyadap_id: document.getElementById('penyadapId').value,
+    penyadap_id: penyadapId,
     tanggal: document.getElementById('tanggal').value,
     berat_kg: parseFloat(document.getElementById('beratKg').value),
     keterangan: document.getElementById('keterangan').value,

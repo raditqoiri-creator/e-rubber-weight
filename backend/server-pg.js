@@ -234,6 +234,29 @@ app.get('/api/export/csv', async (req, res) => {
   res.send(csv);
 });
 
+// ===== USERS =====
+app.get('/api/users', async (req, res) => {
+  const { rows } = await pool.query('SELECT id, username, nama, role FROM users ORDER BY id');
+  res.json(rows);
+});
+app.post('/api/users', async (req, res) => {
+  const { username, password, nama, role } = req.body;
+  if (!username || !password) return res.status(400).json({ error: 'Username dan password wajib diisi' });
+  try {
+    const { rows } = await pool.query(
+      'INSERT INTO users (username, password, nama, role) VALUES ($1,$2,$3,$4) RETURNING id',
+      [username, password, nama || null, role || 'petugas']
+    );
+    res.json({ id: rows[0].id });
+  } catch (e) {
+    res.status(400).json({ error: 'Username sudah dipakai' });
+  }
+});
+app.delete('/api/users/:id', async (req, res) => {
+  await pool.query('DELETE FROM users WHERE id=$1', [req.params.id]);
+  res.json({ success: true });
+});
+
 // ===== ACTIVITY LOG =====
 app.get('/api/activity-log', async (req, res) => {
   const { rows } = await pool.query('SELECT * FROM activity_log ORDER BY waktu DESC LIMIT 100');
