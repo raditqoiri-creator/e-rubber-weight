@@ -144,7 +144,9 @@ app.delete('/api/penyadap/:id', async (req, res) => {
 app.get('/api/catatan', async (req, res) => {
   const { tanggal_awal, tanggal_akhir, blok_id, penyadap_id } = req.query;
   let query = `
-    SELECT catatan_sadap.*, penyadap.nama as nama_penyadap, blok.nama_blok, afdeling.nama_afdeling
+    SELECT catatan_sadap.id, catatan_sadap.penyadap_id, catatan_sadap.berat_kg, catatan_sadap.keterangan, catatan_sadap.dibuat_pada,
+      to_char(catatan_sadap.tanggal, 'YYYY-MM-DD') as tanggal,
+      penyadap.nama as nama_penyadap, blok.nama_blok, afdeling.nama_afdeling
     FROM catatan_sadap
     JOIN penyadap ON catatan_sadap.penyadap_id = penyadap.id
     JOIN blok ON penyadap.blok_id = blok.id

@@ -37,6 +37,9 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   const errorMsg = document.getElementById('errorMsg');
+  const submitBtn = e.target.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Memproses...';
   try {
     const res = await fetch('/api/login', {
       method: 'POST',
@@ -50,6 +53,8 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
   } catch (err) {
     errorMsg.textContent = err.message;
     errorMsg.classList.remove('d-none');
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Masuk';
   }
 });
 </script>
