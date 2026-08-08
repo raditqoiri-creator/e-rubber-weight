@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const bcrypt = require('bcryptjs');
 const { pool, ensureInit } = require('./db-pg');
 
 const app = express();
@@ -18,11 +19,56 @@ async function logAktivitas(user, aksi, detail) {
 // ===== AUTH =====
 app.post('/api/login', async (req, res) => {
   const { username, password } = req.body;
-  const { rows } = await pool.query('SELECT * FROM users WHERE username=$1 AND password=$2', [username, password]);
+  const { rows } = await pool.query('SELECT * FROM users WHERE username=$1', [username]);
   const user = rows[0];
   if (!user) return res.status(401).json({ error: 'Username atau password salah' });
+
+  const isHashed = user.password.startsWith('$2a$') || user.password.startsWith('$2b$');
+  let valid = false;
+  if (isHashed) {
+    valid = bcrypt.compareSync(password, user.password);
+  } else {
+    // Akun lama yang passwordnya masih plaintext: cek langsung, lalu upgrade ke hash
+    valid = user.password === password;
+    if (valid) {
+      const newHash = bcrypt.hashSync(password, 10);
+      await pool.query('UPDATE users SET password=$1 WHERE id=$2', [newHash, user.id]);
+    }
+  }
+  if (!valid) return res.status(401).json({ error: 'Username atau password salah' });
+
   await logAktivitas(username, 'login', 'Berhasil login');
   res.json({ id: user.id, username: user.username, nama: user.nama, role: user.role });
+});
+
+// ===== GANTI PASSWORD =====
+app.post('/api/ganti-password', async (req, res) => {
+  const { user_id, password_lama, password_baru } = req.body;
+  if (!user_id || !password_baru) return res.status(400).json({ error: 'Data tidak lengkap' });
+  if (password_baru.length < 6) return res.status(400).json({ error: 'Password baru minimal 6 karakter' });
+
+  const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [user_id]);
+  const user = rows[0];
+  if (!user) return res.status(404).json({ error: 'Pengguna tidak ditemukan' });
+
+  const isHashed = user.password.startsWith('$2a$') || user.password.startsWith('$2b$');
+  const cocokLama = isHashed ? bcrypt.compareSync(password_lama, user.password) : user.password === password_lama;
+  if (!cocokLama) return res.status(401).json({ error: 'Password lama tidak sesuai' });
+
+  const newHash = bcrypt.hashSync(password_baru, 10);
+  await pool.query('UPDATE users SET password=$1 WHERE id=$2', [newHash, user_id]);
+  await logAktivitas(user.username, 'ganti_password', 'Password berhasil diubah');
+  res.json({ success: true });
+});
+
+// Reset password oleh admin (tanpa perlu tahu password lama)
+app.post('/api/reset-password/:id', async (req, res) => {
+  const { password_baru, admin_user } = req.body;
+  if (!password_baru || password_baru.length < 6) return res.status(400).json({ error: 'Password baru minimal 6 karakter' });
+  const newHash = bcrypt.hashSync(password_baru, 10);
+  await pool.query('UPDATE users SET password=$1 WHERE id=$2', [newHash, req.params.id]);
+  await logAktivitas(admin_user || 'admin', 'reset_password', `Reset password untuk user #${req.params.id}`);
+  res.json({ success: true });
 });
 
 // ===== AFDELING =====
@@ -242,10 +288,12 @@ app.get('/api/users', async (req, res) => {
 app.post('/api/users', async (req, res) => {
   const { username, password, nama, role } = req.body;
   if (!username || !password) return res.status(400).json({ error: 'Username dan password wajib diisi' });
+  if (password.length < 6) return res.status(400).json({ error: 'Password minimal 6 karakter' });
   try {
+    const hashed = bcrypt.hashSync(password, 10);
     const { rows } = await pool.query(
       'INSERT INTO users (username, password, nama, role) VALUES ($1,$2,$3,$4) RETURNING id',
-      [username, password, nama || null, role || 'petugas']
+      [username, hashed, nama || null, role || 'petugas']
     );
     res.json({ id: rows[0].id });
   } catch (e) {

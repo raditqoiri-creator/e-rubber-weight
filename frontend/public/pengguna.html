@@ -30,8 +30,8 @@
             <input type="text" class="form-control" id="usernameUser" required>
           </div>
           <div class="mb-2">
-            <label class="form-label small">Password</label>
-            <input type="text" class="form-control" id="passwordUser" required>
+            <label class="form-label small">Password (min. 6 karakter)</label>
+            <input type="password" class="form-control" id="passwordUser" required minlength="6">
           </div>
           <div class="mb-2">
             <label class="form-label small">Peran</label>
@@ -59,10 +59,29 @@
   </div>
 </div>
 
+<div class="modal fade" id="modalReset">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Reset Password Pengguna</h6></div>
+      <div class="modal-body">
+        <p class="small text-muted">Reset password untuk: <strong id="namaUserReset"></strong></p>
+        <label class="form-label small">Password Baru (min. 6 karakter)</label>
+        <input type="password" class="form-control" id="passwordBaruReset" minlength="6">
+        <div id="msgReset" class="alert py-2 mt-2 d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+        <button class="btn text-white" style="background:#2d6a4f;" onclick="simpanReset()">Reset Password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="nav.js"></script>
 <script>
 renderNav('pengguna.html');
 const user = getUser();
+let resetUserId = null;
 
 const labelRole = { admin: 'Administrator', krani: 'Krani / Staf Administrasi', asisten: 'Asisten Afdeling', mandor: 'Mandor' };
 
@@ -81,7 +100,8 @@ async function loadUsers() {
       <td>${u.username}</td>
       <td>${labelRole[u.role] || u.role}</td>
       <td class="text-end">
-        ${u.username !== 'admin' ? `<button class="btn btn-sm btn-outline-danger" onclick="hapusUser(${u.id})">Hapus</button>` : '<span class="text-muted small">Akun utama</span>'}
+        <button class="btn btn-sm btn-outline-secondary me-1" onclick="bukaReset(${u.id}, '${(u.nama || u.username).replace(/'/g, "")}')">Reset Password</button>
+        ${u.username !== 'admin' ? `<button class="btn btn-sm btn-outline-danger" onclick="hapusUser(${u.id})">Hapus</button>` : ''}
       </td>
     </tr>
   `).join('') || '<tr><td colspan="4" class="text-muted">Belum ada pengguna lain</td></tr>';
@@ -91,6 +111,33 @@ async function hapusUser(id) {
   if (!confirm('Hapus pengguna ini?')) return;
   await fetch(`/api/users/${id}`, { method: 'DELETE' });
   loadUsers();
+}
+
+function bukaReset(id, nama) {
+  resetUserId = id;
+  document.getElementById('namaUserReset').textContent = nama;
+  document.getElementById('passwordBaruReset').value = '';
+  document.getElementById('msgReset').classList.add('d-none');
+  new bootstrap.Modal(document.getElementById('modalReset')).show();
+}
+
+async function simpanReset() {
+  const password_baru = document.getElementById('passwordBaruReset').value;
+  const msg = document.getElementById('msgReset');
+  const res = await fetch(`/api/reset-password/${resetUserId}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ password_baru, admin_user: user.username })
+  });
+  const data = await res.json();
+  msg.classList.remove('d-none');
+  if (!res.ok) {
+    msg.className = 'alert alert-danger py-2';
+    msg.textContent = data.error;
+  } else {
+    msg.className = 'alert alert-success py-2';
+    msg.textContent = 'Password berhasil direset';
+    setTimeout(() => bootstrap.Modal.getInstance(document.getElementById('modalReset')).hide(), 1000);
+  }
 }
 
 document.getElementById('formUser').addEventListener('submit', async (e) => {

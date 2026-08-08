@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -61,9 +62,10 @@ async function initDb() {
 
   const { rows: userRows } = await pool.query('SELECT COUNT(*) FROM users');
   if (parseInt(userRows[0].count) === 0) {
+    const hashedDefault = bcrypt.hashSync('admin123', 10);
     await pool.query(
       'INSERT INTO users (username, password, nama, role) VALUES ($1,$2,$3,$4)',
-      ['admin', 'admin123', 'Administrator', 'admin']
+      ['admin', hashedDefault, 'Administrator', 'admin']
     );
   }
 

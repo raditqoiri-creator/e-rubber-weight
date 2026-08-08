@@ -1,4 +1,5 @@
 const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
 const path = require('path');
 
 const db = new Database(path.join(__dirname, 'erubberweight.db'));
@@ -63,8 +64,9 @@ CREATE TABLE IF NOT EXISTS activity_log (
 // Seed default admin user & harga upah jika kosong
 const userCount = db.prepare('SELECT COUNT(*) as c FROM users').get().c;
 if (userCount === 0) {
+  const hashedDefault = bcrypt.hashSync('admin123', 10);
   db.prepare('INSERT INTO users (username, password, nama, role) VALUES (?,?,?,?)')
-    .run('admin', 'admin123', 'Administrator', 'admin');
+    .run('admin', hashedDefault, 'Administrator', 'admin');
 }
 const hargaCount = db.prepare('SELECT COUNT(*) as c FROM pengaturan_upah').get().c;
 if (hargaCount === 0) {
